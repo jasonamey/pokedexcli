@@ -5,69 +5,76 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/jasonamey/pokedexcli/internal/pokeapi"
 )
 
-func startRepl() {
-	scanner := bufio.NewScanner(os.Stdin)
+type config struct {
+	pokeapiClient    pokeapi.Client
+	nextLocationsURL *string
+	prevLocationsURL *string
+}
+
+func startRepl(cfg *config) {
+	reader := bufio.NewScanner(os.Stdin)
 	for {
-		fmt.Print(">")
-		scanner.Scan()
-		text := scanner.Text()
-		cleaned := cleanInput(text)
-		if len(cleaned) == 0 {
+		fmt.Print("Pokedex > ")
+		reader.Scan()
+
+		words := cleanInput(reader.Text())
+		if len(words) == 0 {
 			continue
 		}
 
-		command, ok := getCommands()[cleaned[0]]
+		commandName := words[0]
 
-		if !ok {
-			fmt.Println("invalid command!")
+		command, exists := getCommands()[commandName]
+		if exists {
+			err := command.callback(cfg)
+			if err != nil {
+				fmt.Println(err)
+			}
+			continue
+		} else {
+			fmt.Println("Unknown command")
 			continue
 		}
-
-		command.callback()
-
-		// switch command.name {
-		// case "help":
-		// 	command.callback()
-		// 	// fmt.Println("Welcome to the Pokedex help menu")
-		// 	// fmt.Println("Here are your commands")
-		// 	// fmt.Println(" - help")
-		// 	// fmt.Println(" - exit")
-		// 	// fmt.Println("")
-
-		// case "exit":
-		// 	command.callback()
-		// default:
-		// 	fmt.Println("Invalid Command")
-		// }
 	}
+}
+
+func cleanInput(text string) []string {
+	output := strings.ToLower(text)
+	words := strings.Fields(output)
+	return words
 }
 
 type cliCommand struct {
 	name        string
 	description string
-	callback    func() error
+	callback    func(*config) error
 }
 
 func getCommands() map[string]cliCommand {
 	return map[string]cliCommand{
 		"help": {
 			name:        "help",
-			description: "Prints the help menu",
-			callback:    callbackHelp,
+			description: "Displays a help message",
+			callback:    commandHelp,
+		},
+		"mapb": {
+			name:        "mapb",
+			description: "Get the previous page of locations",
+			callback:    commandMapb,
+		},
+		"mapf": {
+			name:        "mapf",
+			description: "Get the next page of locations",
+			callback:    commandMapf,
 		},
 		"exit": {
 			name:        "exit",
-			description: "Turns off the Pokedex",
-			callback:    exitHelp,
+			description: "Exit the Pokedex",
+			callback:    commandExit,
 		},
 	}
-}
-
-func cleanInput(str string) []string {
-	lowered := strings.ToLower(str)
-	words := strings.Fields(lowered)
-
-	return words
 }
